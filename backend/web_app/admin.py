@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from .models import (
     User, GameRound, Bet, Transaction,
     ChatMessage, Rain, UserStatistics, MpesaPayment, SystemSettings
@@ -49,13 +50,20 @@ class GameRoundAdmin(admin.ModelAdmin):
         color = colors.get(obj.status, 'gray')
         return format_html(
             '<span style="color:white;background:{};padding:2px 8px;border-radius:4px;">{}</span>',
-            color, obj.status.title()
+            color, obj.get_status_display()  # Use get_status_display() instead of title()
         )
     status_badge.short_description = 'Status'
 
     def multiplier_display(self, obj):
-        if obj.multiplier:
-            return format_html('<strong>{:.2f}x</strong>', obj.multiplier)
+        if obj.multiplier is not None:
+            # Convert Decimal to float and format
+            try:
+                # Format the number first as a string
+                multiplier_value = float(obj.multiplier)
+                # Return as HTML string
+                return mark_safe(f'<strong>{multiplier_value:.2f}x</strong>')
+            except (TypeError, ValueError):
+                return '-'
         return '-'
     multiplier_display.short_description = 'Multiplier'
 
@@ -95,7 +103,7 @@ class BetAdmin(admin.ModelAdmin):
         color = colors.get(obj.status, 'gray')
         return format_html(
             '<span style="color:white;background:{};padding:2px 8px;border-radius:4px;">{}</span>',
-            color, obj.status.title()
+            color, obj.get_status_display()  # Use get_status_display()
         )
     status_badge.short_description = 'Status'
 
@@ -127,7 +135,7 @@ class TransactionAdmin(admin.ModelAdmin):
         color = colors.get(obj.transaction_type, 'gray')
         return format_html(
             '<span style="color:white;background:{};padding:2px 8px;border-radius:4px;">{}</span>',
-            color, obj.transaction_type.title()
+            color, obj.get_transaction_type_display()  # Use get_transaction_type_display()
         )
     type_badge.short_description = 'Type'
 
@@ -139,7 +147,7 @@ class TransactionAdmin(admin.ModelAdmin):
         color = colors.get(obj.status, 'gray')
         return format_html(
             '<span style="color:white;background:{};padding:2px 8px;border-radius:4px;">{}</span>',
-            color, obj.status.title()
+            color, obj.get_status_display()  # Use get_status_display()
         )
     status_badge.short_description = 'Status'
 
@@ -168,7 +176,7 @@ class MpesaPaymentAdmin(admin.ModelAdmin):
         color = colors.get(obj.status, 'gray')
         return format_html(
             '<span style="color:white;background:{};padding:2px 8px;border-radius:4px;">{}</span>',
-            color, obj.status.title()
+            color, obj.get_status_display()  # Use get_status_display()
         )
     status_badge.short_description = 'Status'
 
