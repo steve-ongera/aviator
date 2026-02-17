@@ -274,9 +274,10 @@ class GameViewSet(viewsets.GenericViewSet):
 
             # Update stats
             stats, _ = UserStatistics.objects.get_or_create(user=user)
+            stats.total_wagered += Decimal(amount)
             stats.total_bets += 1
-            stats.total_wagered += float(amount)
             stats.save()
+
 
         return Response({
             'success': True,
