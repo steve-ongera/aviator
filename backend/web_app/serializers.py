@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
+from decimal import Decimal
 from .models import User, GameRound, Bet, Transaction, ChatMessage, Rain, UserStatistics, MpesaPayment
 
 
@@ -21,7 +22,6 @@ class RegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data.pop('confirm_password')
         user = User.objects.create_user(**validated_data)
-        # Create statistics record
         UserStatistics.objects.get_or_create(user=user)
         return user
 
@@ -101,16 +101,44 @@ class GameRoundHistorySerializer(serializers.ModelSerializer):
 # ─── Bet Serializers ─────────────────────────────────────────────────────────
 
 class PlaceBetSerializer(serializers.Serializer):
-    amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=10, max_value=50000)
-    auto_cashout = serializers.DecimalField(
-        max_digits=10, decimal_places=2,
-        min_value=1.01, required=False, allow_null=True
+    # coerce_to_string=False ensures validated_data holds Decimal, not a string
+    amount = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        min_value=Decimal('10'),
+        max_value=Decimal('50000'),
+        coerce_to_string=False
     )
+    auto_cashout = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        min_value=Decimal('1.01'),
+        coerce_to_string=False,
+        required=False,
+        allow_null=True
+    )
+
+    def validate_amount(self, value):
+        # Force Decimal regardless of what came in (float from JSON, string, etc.)
+        return Decimal(str(value))
+
+    def validate_auto_cashout(self, value):
+        if value is None:
+            return None
+        return Decimal(str(value))
 
 
 class CashoutSerializer(serializers.Serializer):
     bet_id = serializers.UUIDField()
-    multiplier = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=1.00)
+    multiplier = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        min_value=Decimal('1.00'),
+        coerce_to_string=False
+    )
+
+    def validate_multiplier(self, value):
+        return Decimal(str(value))
 
 
 class BetSerializer(serializers.ModelSerializer):
@@ -127,7 +155,6 @@ class BetSerializer(serializers.ModelSerializer):
 
     def get_username(self, obj):
         phone = obj.user.phone_number
-        # Mask: show last 4 digits + stars
         return phone[-4:] + '****'
 
     def get_round_number(self, obj):
@@ -135,7 +162,7 @@ class BetSerializer(serializers.ModelSerializer):
 
 
 class ActiveBetSerializer(serializers.ModelSerializer):
-    """Minimal serializer for live game display"""
+    """Minimal serializer for live game display."""
     username = serializers.SerializerMethodField()
 
     class Meta:
@@ -148,7 +175,7 @@ class ActiveBetSerializer(serializers.ModelSerializer):
 
 
 class UserBetSerializer(serializers.ModelSerializer):
-    """For user's own bet history - shows full info"""
+    """Full bet info for user's own history."""
     round_number = serializers.SerializerMethodField()
     crash_at = serializers.SerializerMethodField()
 
@@ -180,20 +207,37 @@ class TransactionSerializer(serializers.ModelSerializer):
 
 
 class DepositSerializer(serializers.Serializer):
-    amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=10, max_value=300000)
-    phone_number = serializers.CharField(max_length=15, required=False)
+    amount = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        min_value=Decimal('10'),
+        max_value=Decimal('300000'),
+        coerce_to_string=False
+    )
+    phone_number = serializers.CharField(max_length=15, required=False, allow_blank=True)
+
+    def validate_amount(self, value):
+        return Decimal(str(value))
 
     def validate_phone_number(self, value):
         if value:
             import re
             if not re.match(r'^\+?254?\d{9,12}$', value):
-                raise serializers.ValidationError('Invalid phone number format.')
+                raise serializers.ValidationError('Invalid phone number format. Use +254XXXXXXXXX')
         return value
 
 
 class WithdrawSerializer(serializers.Serializer):
-    amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=100)
-    phone_number = serializers.CharField(max_length=15, required=False)
+    amount = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        min_value=Decimal('100'),
+        coerce_to_string=False
+    )
+    phone_number = serializers.CharField(max_length=15, required=False, allow_blank=True)
+
+    def validate_amount(self, value):
+        return Decimal(str(value))
 
 
 class CompleteDepositSerializer(serializers.Serializer):
